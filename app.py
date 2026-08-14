@@ -64,7 +64,8 @@ def conn():
 
 def init():
     c=conn()
-    c.execute("""CREATE TABLE IF NOT EXISTS candidates(
+    # Use TIMESTAMPTZ for timezone-aware timestamps and set a safe integer default directly in DDL
+    c.execute(f"""CREATE TABLE IF NOT EXISTS candidates(
     id BIGSERIAL PRIMARY KEY,
     token TEXT UNIQUE,
     assessment_id TEXT UNIQUE,
@@ -82,11 +83,11 @@ def init():
     integrity_accepted BOOLEAN DEFAULT FALSE,
     webcam_consent_accepted BOOLEAN DEFAULT FALSE,
     webcam_permission_granted BOOLEAN DEFAULT FALSE,
-    start_time TIMESTAMP,
-    end_time TIMESTAMP,
-    duration_minutes INTEGER DEFAULT %s,
+    start_time TIMESTAMPTZ,
+    end_time TIMESTAMPTZ,
+    duration_minutes INTEGER DEFAULT {ASSESSMENT_DURATION_MINUTES},
     submitted_at TEXT
-    )""",(ASSESSMENT_DURATION_MINUTES,))
+    )""")
     # Add any missing columns to keep compatibility with older DBs
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS assessment_id TEXT")
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS recruiter_id TEXT")
@@ -94,8 +95,8 @@ def init():
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS integrity_accepted BOOLEAN DEFAULT FALSE")
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS webcam_consent_accepted BOOLEAN DEFAULT FALSE")
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS webcam_permission_granted BOOLEAN DEFAULT FALSE")
-    c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS start_time TIMESTAMP")
-    c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS end_time TIMESTAMP")
+    c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ")
+    c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS end_time TIMESTAMPTZ")
     c.execute("ALTER TABLE candidates ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT %s",(ASSESSMENT_DURATION_MINUTES,))
     c.commit();c.close()
 init()
@@ -202,9 +203,10 @@ def begin():
     token=secrets.token_urlsafe(16)
     assessment_id=f"ASMT-{secrets.token_hex(3).upper()}"
     now=datetime.now(timezone.utc)
+    webcam_granted = True if webcam_permission else False
     c=conn()
     c.execute("""INSERT INTO candidates(token,assessment_id,name,email,integrity_accepted,webcam_consent_accepted,webcam_permission_granted,start_time,duration_minutes)
-                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(token,assessment_id,name,email,True,True,True,now,ASSESSMENT_DURATION_MINUTES))
+                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)""",(token,assessment_id,name,email,True,True,webcam_granted,now,ASSESSMENT_DURATION_MINUTES))
     c.commit();c.close()
     return redirect(url_for('take',token=token))
 
