@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203, W503
+# Project-specific ignores: long HTML strings in app.py produce E501; keep max-line-length increased to accommodate.
